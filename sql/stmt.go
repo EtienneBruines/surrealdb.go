@@ -35,7 +35,7 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	data := make([]driver.Value, len(cols))
 
 	driverResult := Result{}
-	for err := rows.Next(data); err != nil; err = rows.Next(data) {
+	if err := rows.Next(data); err != nil {
 		driverResult.AffectedRows++
 	}
 	return driverResult, nil

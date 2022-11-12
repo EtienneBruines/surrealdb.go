@@ -1,6 +1,9 @@
 package sql
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type StringSlice struct {
 	Data []string
@@ -118,4 +121,20 @@ func (s *FloatSlice) Scan(src any) error {
 	}
 
 	return nil
+}
+
+type Many[T any] []T
+
+func (my *Many[T]) Scan(value any) error {
+	if value == nil {
+		*my = Many[T]{}
+		return nil
+	}
+
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(bytes, my)
 }
