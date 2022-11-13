@@ -88,7 +88,15 @@ func main() {
 		fmt.Println("row", resp)
 	}
 
-	// get records by named params
+	// get record using a query with a named param
+	resp := queryResp{}
+	err = db.QueryRow("SELECT id, name, ->posted as posted, ->posted->post AS posts FROM user where name = $crazy_param_name fetch posts, posted", sql.Named("crazy_param_name", "mark")).Scan(&resp.ID, &resp.Name, &resp.Posted, &resp.Posts)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("named param response:", resp)
+
+	// get records by named params using a prepared statement
 	stmt, err := db.Prepare("SELECT id, name, ->posted as posted, ->posted->post AS posts FROM user where name = $user_name fetch posts, posted")
 	if err != nil {
 		panic(err)
