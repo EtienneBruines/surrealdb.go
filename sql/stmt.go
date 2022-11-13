@@ -1,12 +1,13 @@
 package sql
 
 import (
+	"context"
 	"database/sql/driver"
 	"fmt"
 	"regexp"
 )
 
-var inputRegex = regexp.MustCompile("$[a-zA-Z]+")
+var inputRegex = regexp.MustCompile("\\$[a-zA-Z]+")
 
 type Stmt struct {
 	conn *Conn
@@ -26,7 +27,7 @@ func (s *Stmt) NumInput() int {
 }
 
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	rows, err := s.execute(args)
+	rows, err := s.execute(context.Background(), args)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +42,16 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	return driverResult, nil
 }
 
-func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	rows, err := s.execute(args)
+func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	named := map[string]any{}
+	for _, a := range args {
+		named[a.Name] = a.Value
+	}
+
+	actual := []driver.Value{
+		named,
+	}
+	rows, err := s.execute(ctx, actual)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +59,16 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	return rows, nil
 }
 
-func (s *Stmt) execute(args []driver.Value) (*Rows, error) {
+func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
+	rows, err := s.execute(context.Background(), args)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
+}
+
+func (s *Stmt) execute(ctx context.Context, args []driver.Value) (*Rows, error) {
 	argInterfaces := make([]interface{}, len(args)+1)
 	argInterfaces[0] = s.rawQuery
 

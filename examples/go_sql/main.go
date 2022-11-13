@@ -88,6 +88,22 @@ func main() {
 		fmt.Println("row", resp)
 	}
 
+	// get records by named params
+	stmt, err := db.Prepare("SELECT id, name, ->posted as posted, ->posted->post AS posts FROM user where name = $user_name fetch posts, posted")
+	if err != nil {
+		panic(err)
+	}
+	rows, err = stmt.Query(sql.Named("user_name", "mark"))
+	for rows.Next() {
+		resp := queryResp{}
+		err := rows.Scan(&resp.ID, &resp.Name, &resp.Posted, &resp.Posts)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("row", resp)
+	}
+
 	// Cleanup
 	err = db.Close()
 	if err != nil {

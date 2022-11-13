@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
-	"github.com/surrealdb/surrealdb.go"
 	"strings"
+
+	"github.com/surrealdb/surrealdb.go"
 )
 
 type Conn struct {
