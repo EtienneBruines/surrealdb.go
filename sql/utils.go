@@ -2,6 +2,7 @@ package sql
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"reflect"
 	"strings"
 )
@@ -60,4 +61,15 @@ func PrepareQuery(query string) string {
 	}
 
 	return strings.Join(final, " ")
+}
+
+func NamedValuesToValues(namedValues []driver.NamedValue) []driver.Value {
+	named := map[string]any{}
+	for _, n := range namedValues {
+		named[n.Name] = n.Value
+	}
+
+	return []driver.Value{
+		named,
+	}
 }

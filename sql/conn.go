@@ -69,16 +69,13 @@ func (s *Conn) parseMethod(query string) (string, string, error) {
 	return strings.ToLower(query[:idx]), query[idx+1:], nil
 }
 
+func (s *Conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	actual := NamedValuesToValues(args)
+	return s.Execute(ctx, query, actual)
+}
+
 func (s *Conn) ExecerContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	named := map[string]any{}
-	for _, a := range args {
-		named[a.Name] = a.Value
-	}
-
-	actual := []driver.Value{
-		named,
-	}
-
+	actual := NamedValuesToValues(args)
 	rows, err := s.Execute(ctx, query, actual)
 	if err != nil {
 		return nil, err
@@ -90,15 +87,7 @@ func (s *Conn) ExecerContext(ctx context.Context, query string, args []driver.Na
 }
 
 func (s *Conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	named := map[string]any{}
-	for _, a := range args {
-		named[a.Name] = a.Value
-	}
-
-	actual := []driver.Value{
-		named,
-	}
-
+	actual := NamedValuesToValues(args)
 	rows, err := s.Execute(ctx, query, actual)
 	if err != nil {
 		return nil, err
