@@ -48,3 +48,16 @@ func SliceContains[T comparable](arr []T, element T) bool {
 
 	return false
 }
+
+// PrepareQuery allows for queries to be multiple lines by stripping whitespace and
+// replacing newlines with a whitespace
+func PrepareQuery(query string) string {
+	parts := strings.Split(strings.ReplaceAll(query, "\r\n", "\n"), "\n")
+	final := make([]string, len(parts))
+
+	for _, part := range parts {
+		final = append(final, strings.TrimSpace(part))
+	}
+
+	return strings.Join(final, " ")
+}

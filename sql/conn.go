@@ -110,11 +110,7 @@ func (s *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (s *Conn) Execute(ctx context.Context, query string, args []driver.Value) (*Rows, error) {
-	// TODO: abstract prepping the query
-	// trim all leading and trailing whitespace
-	// remove new lines
-	query = newLineRegex.ReplaceAllString(query, " ")
-	query = tabRegex.ReplaceAllString(query, "")
+	query = PrepareQuery(query)
 	argInterfaces := make([]interface{}, len(args)+1)
 	argInterfaces[0] = strings.TrimSpace(query)
 
