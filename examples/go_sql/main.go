@@ -81,7 +81,19 @@ func main() {
 	}
 
 	// Read it back
-	rows, err := db.Query("SELECT id, name, ->posted as posted, ->posted->post AS posts FROM user:mark fetch posts, posted")
+	rows, err := db.Query(`
+	SELECT
+		id,
+		name,
+		->posted as posted,
+		->posted->post AS posts
+	FROM
+		user:mark
+	FETCH
+		posts, posted
+	
+		`)
+
 	if err != nil {
 		panic(err)
 	}

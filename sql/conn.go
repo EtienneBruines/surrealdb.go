@@ -4,10 +4,14 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/surrealdb/surrealdb.go"
 )
+
+var newLineRegex = regexp.MustCompile(`\r?\n`)
+var tabRegex = regexp.MustCompile(`\t`)
 
 type Conn struct {
 	*surrealdb.DB
@@ -106,8 +110,13 @@ func (s *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (s *Conn) Execute(ctx context.Context, query string, args []driver.Value) (*Rows, error) {
+	// TODO: abstract prepping the query
+	// trim all leading and trailing whitespace
+	// remove new lines
+	query = newLineRegex.ReplaceAllString(query, " ")
+	query = tabRegex.ReplaceAllString(query, "")
 	argInterfaces := make([]interface{}, len(args)+1)
-	argInterfaces[0] = query
+	argInterfaces[0] = strings.TrimSpace(query)
 
 	for idx, arg := range args {
 		argInterfaces[idx+1] = s.convertArgument(arg)
