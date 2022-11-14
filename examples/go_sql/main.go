@@ -34,6 +34,15 @@ type queryResp struct {
 
 func main() {
 
+	type x struct {
+		Name  string `json:"name"`
+		Loc   string `json:"location"`
+		Place string `json:"place"`
+	}
+	t := x{"mark", "baltimore", "home"}
+	u := sql2.StructToNamedArgs(t, "place")
+	fmt.Println(u)
+
 	// Connect the way you would usually
 	db, err := sql.Open("surrealdb", "ws://root:root@localhost:8000/?ns=test&db=test")
 	if err != nil {

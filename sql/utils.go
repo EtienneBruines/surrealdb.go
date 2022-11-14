@@ -10,12 +10,12 @@ var DefaultTagName = "json"
 
 // StructToNamedArgs will take a struct and pull all of its "json" (DefaultTagName)
 // while ignoring the excludes
-func StructToNamedArgs(entity any, excludes ...string) []sql.NamedArg {
+func StructToNamedArgs(entity any, excludes ...string) []any {
 	return StructToNamedArgsTagName(entity, DefaultTagName, excludes...)
 }
 
-func StructToNamedArgsTagName(entity any, tagname string, excludes ...string) []sql.NamedArg {
-	args := []sql.NamedArg{}
+func StructToNamedArgsTagName(entity any, tagname string, excludes ...string) []any {
+	args := []any{}
 	entityType := reflect.TypeOf(entity)
 
 	// resolve the entity type and name

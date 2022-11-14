@@ -27,7 +27,7 @@ func (s *Stmt) NumInput() int {
 }
 
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	rows, err := s.execute(context.Background(), args)
+	rows, err := s.conn.Execute(context.Background(), s.rawQuery, args)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	actual := []driver.Value{
 		named,
 	}
-	rows, err := s.execute(ctx, actual)
+	rows, err := s.conn.Execute(ctx, s.rawQuery, actual)
 	if err != nil {
 		return nil, err
 	}
@@ -60,61 +60,12 @@ func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 }
 
 func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	rows, err := s.execute(context.Background(), args)
+	rows, err := s.conn.Execute(context.Background(), s.rawQuery, args)
 	if err != nil {
 		return nil, err
 	}
 
 	return rows, nil
-}
-
-func (s *Stmt) execute(ctx context.Context, args []driver.Value) (*Rows, error) {
-	argInterfaces := make([]interface{}, len(args)+1)
-	argInterfaces[0] = s.rawQuery
-
-	for idx, arg := range args {
-		argInterfaces[idx+1] = s.convertArgument(arg)
-	}
-
-	res, err := s.conn.Send("query", argInterfaces...)
-	if err != nil {
-		return nil, fmt.Errorf("error during Exec: %w", err)
-	}
-
-	arr, ok := res.([]interface{})
-	if !ok || len(arr) != 1 {
-		// No idea what the result is
-		return nil, fmt.Errorf("unknown result")
-	}
-
-	lookup, ok := arr[0].(map[string]interface{})
-	if !ok {
-		// No idea what the result is
-		return nil, fmt.Errorf("unknown result, expected map")
-	}
-
-	status, _ := lookup["status"]
-	//duration, _ := lookup["time"]
-
-	switch status {
-	case "ERR":
-		detail, _ := lookup["detail"]
-		return nil, fmt.Errorf("query error: %s", detail)
-	case "OK":
-		result, _ := lookup["result"]
-		rows, ok := result.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unknown result value")
-		}
-
-		return &Rows{RawData: rows}, nil
-	default:
-		return nil, fmt.Errorf("unknown response status: %s", status)
-	}
-}
-
-func (s *Stmt) convertArgument(val driver.Value) interface{} {
-	return val
 }
 
 type Result struct {
