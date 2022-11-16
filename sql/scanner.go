@@ -1,9 +1,16 @@
 package sql
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"time"
+
+	"github.com/google/uuid"
 )
+
+var uuidRE = regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 type StringSlice struct {
 	Data []string
@@ -137,4 +144,43 @@ func (my *Many[T]) Scan(value any) error {
 	}
 
 	return json.Unmarshal(bytes, my)
+}
+
+// Surreal returns times as strings
+type SurrealTime time.Time
+
+func (s *SurrealTime) Scan(value any) error {
+	// TODO: check other time formats
+	val, err := time.Parse(time.RFC3339, value.(string))
+	*s = SurrealTime(val)
+	return err
+}
+
+func (s *SurrealTime) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+func (s *SurrealTime) Time() time.Time {
+	v, _ := s.Value()
+	return v.(time.Time)
+}
+
+// This supports extracting the UUID from a surrealdb id that could
+// come back in the format of user:uuid or user:`uuid` or user<uuid>
+type SurrealUUID uuid.UUID
+
+func (s *SurrealUUID) Scan(value any) error {
+	uuidSTR := uuidRE.FindString(value.(string))
+	uid, err := uuid.Parse(uuidSTR)
+	*s = SurrealUUID(uid)
+
+	return err
+}
+
+func (s *SurrealUUID) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+func (s *SurrealUUID) UUID() uuid.UUID {
+	return uuid.UUID(*s)
 }

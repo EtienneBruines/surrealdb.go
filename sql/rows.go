@@ -16,12 +16,12 @@ type Rows struct {
 
 func (r *Rows) Columns() []string {
 	if r.nextInLine >= len(r.RawData) {
-		return []string{}
+		return r.detectedColumns
 	}
 
 	lookup, ok := r.RawData[r.nextInLine].(map[string]interface{})
 	if !ok {
-		return []string{} // This should never happen, but we cannot return an err...
+		return r.detectedColumns // This should never happen, but we cannot return an err...
 	}
 
 	r.detectedColumns = make([]string, 0, len(lookup))
@@ -45,6 +45,8 @@ func (r *Rows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 
+	// TODO: hopefully we can property identify column types
+	// when we do, properly cast values here
 	lookup, ok := r.RawData[r.nextInLine].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("unknown format of row")
