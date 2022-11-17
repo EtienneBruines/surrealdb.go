@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
 var DefaultTagName = "json"
+var tagRE = regexp.MustCompile("[^a-zA-Z0-9-_]+")
 
 // StructToNamedArgs will take a struct and pull all of its "json" (DefaultTagName)
 // while ignoring the excludes
@@ -27,7 +29,13 @@ func StructToNamedArgsTagName(entity any, tagname string, excludes ...string) []
 	val := reflect.ValueOf(entity)
 	for i := 0; i < val.NumField(); i++ {
 		field := entityType.Field(i)
-		tag, ok := field.Tag.Lookup(tagname)
+		tagValue, ok := field.Tag.Lookup(tagname)
+		parts := tagRE.Split(tagValue, -1)
+		if len(parts) < 1 {
+			continue
+		}
+
+		tag := parts[0]
 		if !ok || strings.TrimSpace(tag) == "" || SliceContains(excludes, tag) {
 			continue
 		}
