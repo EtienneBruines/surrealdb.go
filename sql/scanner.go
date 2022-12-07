@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -147,22 +148,20 @@ func (my *Many[T]) Scan(value any) error {
 }
 
 // Surreal returns times as strings
-type SurrealTime time.Time
+type SurrealTime struct {
+	time.Time
+}
 
 func (s *SurrealTime) Scan(value any) error {
 	// TODO: check other time formats
 	val, err := time.Parse(time.RFC3339, value.(string))
-	*s = SurrealTime(val)
+	*s = SurrealTime{val}
+
 	return err
 }
 
 func (s *SurrealTime) Value() (driver.Value, error) {
 	return json.Marshal(s)
-}
-
-func (s *SurrealTime) Time() time.Time {
-	v, _ := s.Value()
-	return v.(time.Time)
 }
 
 // This supports extracting the UUID from a surrealdb id that could
@@ -183,4 +182,21 @@ func (s *SurrealUUID) Value() (driver.Value, error) {
 
 func (s *SurrealUUID) UUID() uuid.UUID {
 	return uuid.UUID(*s)
+}
+
+type SurrealAutoID string
+
+func (s *SurrealAutoID) Scan(value any) error {
+	parts := strings.Split(value.(string), ":")
+	if len(parts) < 1 {
+		return fmt.Errorf(`%v is not a valid SurrealAutoID`, value)
+	}
+
+	*s = SurrealAutoID(parts[1])
+
+	return nil
+}
+
+func (s *SurrealAutoID) Value() (driver.Value, error) {
+	return json.Marshal(s)
 }

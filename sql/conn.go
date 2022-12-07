@@ -100,7 +100,7 @@ func (s *Conn) ExecContext(ctx context.Context, query string, args []driver.Name
 
 func (s *Conn) Execute(ctx context.Context, query string, args []driver.Value) (*Rows, error) {
 	query = PrepareQuery(query)
-	argInterfaces := make([]interface{}, len(args)+1)
+	argInterfaces := make([]any, len(args)+1)
 	argInterfaces[0] = strings.TrimSpace(query)
 
 	for idx, arg := range args {
@@ -112,13 +112,13 @@ func (s *Conn) Execute(ctx context.Context, query string, args []driver.Value) (
 		return nil, fmt.Errorf("error during Exec: %w", err)
 	}
 
-	arr, ok := res.([]interface{})
+	arr, ok := res.([]any)
 	if !ok || len(arr) != 1 {
 		// No idea what the result is
 		return nil, fmt.Errorf("unknown result")
 	}
 
-	lookup, ok := arr[0].(map[string]interface{})
+	lookup, ok := arr[0].(map[string]any)
 	if !ok {
 		// No idea what the result is
 		return nil, fmt.Errorf("unknown result, expected map")
@@ -132,10 +132,14 @@ func (s *Conn) Execute(ctx context.Context, query string, args []driver.Value) (
 		detail, _ := lookup["detail"]
 		return nil, fmt.Errorf("query error: %s", detail)
 	case "OK":
+		rows := []any{}
 		result, _ := lookup["result"]
-		rows, ok := result.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unknown result value")
+
+		if result != nil {
+			rows, ok = result.([]any)
+			if !ok {
+				return nil, fmt.Errorf("unknown result value")
+			}
 		}
 
 		return &Rows{RawData: rows}, nil
@@ -144,7 +148,7 @@ func (s *Conn) Execute(ctx context.Context, query string, args []driver.Value) (
 	}
 }
 
-func (s *Conn) convertArgument(val driver.Value) interface{} {
+func (s *Conn) convertArgument(val driver.Value) any {
 	return val
 }
 
