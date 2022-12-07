@@ -7,6 +7,9 @@
 .AppleDouble
 .LSOverride
 
+# misc. editors
+.vscode
+
 # Thumbnail files
 ._*
 
