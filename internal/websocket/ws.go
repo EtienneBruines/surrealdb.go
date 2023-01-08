@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -88,12 +89,13 @@ func (ws *WebSocket) Send(id, method string, params []interface{}) (interface{},
 		case <-tick.C:
 			return nil, errors.New("timeout")
 		case res := <-ws.respChan:
-			if res.ID != id {
-				continue
-			}
 
 			if res.Error != nil {
 				return nil, fmt.Errorf("error response: %w", res.Error)
+			}
+
+			if res.ID != id {
+				continue
 			}
 
 			return res.Result, nil
@@ -110,8 +112,18 @@ func (ws *WebSocket) read(v interface{}) error {
 	return json.Unmarshal(data, v)
 }
 
+// JSONMarshal will marshal json without escaping html chars
+// useful for perserving pointers (->) in path queries
+func JSONMarshal(t interface{}) ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(t)
+	return buffer.Bytes(), err
+}
+
 func (ws *WebSocket) write(v interface{}) error {
-	data, err := json.Marshal(v)
+	data, err := JSONMarshal(v)
 	if err != nil {
 		return err
 	}

@@ -3,17 +3,58 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"time"
+
 	sql2 "github.com/surrealdb/surrealdb.go/sql"
 
 	_ "github.com/surrealdb/surrealdb.go/sql"
 )
 
+type user struct {
+	sql2.BaseEntity
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+type post struct {
+	sql2.BaseEntity
+	Title string `json:"title"`
+	Slug  string `json:"slug"`
+}
+
+type posted struct {
+	sql2.BaseRelationship
+	When time.Time `json:"when"`
+}
+
+type queryResp struct {
+	user
+	Posts  sql2.Many[post]   `json:"posts"`
+	Posted sql2.Many[posted] `json:"posted"`
+}
+
 func main() {
+
+	type x struct {
+		Name  string `json:"name"`
+		Loc   string `json:"location"`
+		Place string `json:"place"`
+	}
+	t := x{"mark", "baltimore", "home"}
+	u := sql2.StructToNamedArgs(t, "place")
+	fmt.Println(u)
+
 	// Connect the way you would usually
-	db, err := sql.Open("surrealdb", "ws://root:root@localhost:9091/?ns=my-namespace&db=dbname")
+	db, err := sql.Open("surrealdb", "ws://root:root@localhost:8000/?ns=test&db=test")
 	if err != nil {
 		panic(err)
 	}
+
+	// clear tables
+	func() {
+		db.Exec("DELETE user")
+		db.Exec("DELETE post")
+		db.Exec("DELETE posted")
+	}()
 
 	// Make sure we can ping to it
 	err = db.Ping()
@@ -22,30 +63,74 @@ func main() {
 	}
 
 	// Create some value
-	_, err = db.Exec("CREATE company SET name = 'SurrealDB', cofounders = [person:tobie, person:jaime]")
+	_, err = db.Exec("CREATE user:mark SET name = 'mark', age = 9999")
 	if err != nil {
 		panic(err)
 	}
 
-	// Read it back
-	rows, err := db.Query("SELECT cofounders, id, name FROM company")
-	if err != nil {
-		panic(err)
-	}
-	for rows.Next() {
-		var (
-			name       string
-			id         string
-			cofounders sql2.StringSlice
-		)
-
-		// Note: the columns are always sorted alphabetically, regardless of the order in your query
-		err := rows.Scan(&cofounders, &id, &name)
+	for i := 0; i < 20; i++ {
+		_, err = db.Exec(fmt.Sprintf("CREATE post:%v SET title = '%v', slug='%v'", i, i, i))
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("row", id, name, cofounders)
+		_, err = db.Exec(fmt.Sprintf("RELATE user:mark->posted->post:%v SET when=time::now()", i))
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// Read it back
+	rows, err := db.Query(`
+	SELECT
+		id,
+		name,
+		->posted as posted,
+		->posted->post AS posts
+	FROM
+		user:mark
+	FETCH
+		posts, posted
+	
+		`)
+
+	if err != nil {
+		panic(err)
+	}
+	for rows.Next() {
+		resp := queryResp{}
+
+		// Note: the columns are always sorted alphabetically, regardless of the order in your query
+		err := rows.Scan(&resp.ID, &resp.Name, &resp.Posted, &resp.Posts)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("row", resp)
+	}
+
+	// get record using a query with a named param
+	resp := queryResp{}
+	err = db.QueryRow("SELECT id, name, ->posted as posted, ->posted->post AS posts FROM user where name = $crazy_param_name fetch posts, posted", sql.Named("crazy_param_name", "mark")).Scan(&resp.ID, &resp.Name, &resp.Posted, &resp.Posts)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("named param response:", resp)
+
+	// get records by named params using a prepared statement
+	stmt, err := db.Prepare("SELECT id, name, ->posted as posted, ->posted->post AS posts FROM user where name = $user_name fetch posts, posted")
+	if err != nil {
+		panic(err)
+	}
+	rows, err = stmt.Query(sql.Named("user_name", "mark"))
+	for rows.Next() {
+		resp := queryResp{}
+		err := rows.Scan(&resp.ID, &resp.Name, &resp.Posted, &resp.Posts)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("row", resp)
 	}
 
 	// Cleanup

@@ -1,6 +1,17 @@
 package sql
 
-import "fmt"
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+var uuidRE = regexp.MustCompile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 type StringSlice struct {
 	Data []string
@@ -118,4 +129,83 @@ func (s *FloatSlice) Scan(src any) error {
 	}
 
 	return nil
+}
+
+type Many[T any] []T
+
+func (my *Many[T]) Scan(value any) error {
+	if value == nil {
+		*my = Many[T]{}
+		return nil
+	}
+
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(bytes, my)
+}
+
+// Surreal returns times as strings
+type SurrealTime struct {
+	time.Time
+}
+
+func (s *SurrealTime) Scan(value any) error {
+	// TODO: check other time formats
+	val, err := time.Parse(time.RFC3339, value.(string))
+	*s = SurrealTime{val}
+
+	return err
+}
+
+func (s *SurrealTime) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+// This supports extracting the UUID from a surrealdb id that could
+// come back in the format of user:uuid or user:`uuid` or user<uuid>
+type SurrealUUID uuid.UUID
+
+func (s *SurrealUUID) Scan(value any) error {
+	uuidSTR := uuidRE.FindString(value.(string))
+	uid, err := uuid.Parse(uuidSTR)
+	*s = SurrealUUID(uid)
+
+	return err
+}
+
+func (s SurrealUUID) MarshalText() (text []byte, err error) {
+	return (s.UUID()).MarshalText()
+}
+
+func (s *SurrealUUID) UnmarshalText(data []byte) error {
+	sUID := s.UUID()
+	return sUID.UnmarshalText(data)
+}
+
+func (s *SurrealUUID) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+func (s *SurrealUUID) UUID() uuid.UUID {
+	return uuid.UUID(*s)
+}
+
+type SurrealAutoID string
+
+func (s *SurrealAutoID) Scan(value any) error {
+	parts := strings.Split(value.(string), ":")
+	if len(parts) < 1 {
+		return fmt.Errorf(`%v is not a valid SurrealAutoID`, value)
+	}
+
+	*s = SurrealAutoID(parts[1])
+
+	return nil
+}
+
+func (s *SurrealAutoID) Value() (driver.Value, error) {
+	return json.Marshal(s)
 }

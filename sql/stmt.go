@@ -1,12 +1,13 @@
 package sql
 
 import (
+	"context"
 	"database/sql/driver"
 	"fmt"
 	"regexp"
 )
 
-var inputRegex = regexp.MustCompile("$[a-zA-Z]+")
+var inputRegex = regexp.MustCompile("\\$[a-zA-Z]+")
 
 type Stmt struct {
 	conn *Conn
@@ -26,7 +27,7 @@ func (s *Stmt) NumInput() int {
 }
 
 func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
-	rows, err := s.execute(args)
+	rows, err := s.conn.Execute(context.Background(), s.rawQuery, args)
 	if err != nil {
 		return nil, err
 	}
@@ -35,14 +36,22 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 	data := make([]driver.Value, len(cols))
 
 	driverResult := Result{}
-	for err := rows.Next(data); err != nil; err = rows.Next(data) {
+	if err := rows.Next(data); err != nil {
 		driverResult.AffectedRows++
 	}
 	return driverResult, nil
 }
 
-func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
-	rows, err := s.execute(args)
+func (s *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	named := map[string]any{}
+	for _, a := range args {
+		named[a.Name] = a.Value
+	}
+
+	actual := []driver.Value{
+		named,
+	}
+	rows, err := s.conn.Execute(ctx, s.rawQuery, actual)
 	if err != nil {
 		return nil, err
 	}
@@ -50,53 +59,13 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	return rows, nil
 }
 
-func (s *Stmt) execute(args []driver.Value) (*Rows, error) {
-	argInterfaces := make([]interface{}, len(args)+1)
-	argInterfaces[0] = s.rawQuery
-
-	for idx, arg := range args {
-		argInterfaces[idx+1] = s.convertArgument(arg)
-	}
-
-	res, err := s.conn.Send("query", argInterfaces...)
+func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
+	rows, err := s.conn.Execute(context.Background(), s.rawQuery, args)
 	if err != nil {
-		return nil, fmt.Errorf("error during Exec: %w", err)
+		return nil, err
 	}
 
-	arr, ok := res.([]interface{})
-	if !ok || len(arr) != 1 {
-		// No idea what the result is
-		return nil, fmt.Errorf("unknown result")
-	}
-
-	lookup, ok := arr[0].(map[string]interface{})
-	if !ok {
-		// No idea what the result is
-		return nil, fmt.Errorf("unknown result, expected map")
-	}
-
-	status, _ := lookup["status"]
-	//duration, _ := lookup["time"]
-
-	switch status {
-	case "ERR":
-		detail, _ := lookup["detail"]
-		return nil, fmt.Errorf("query error: %s", detail)
-	case "OK":
-		result, _ := lookup["result"]
-		rows, ok := result.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("unknown result value")
-		}
-
-		return &Rows{RawData: rows}, nil
-	default:
-		return nil, fmt.Errorf("unknown response status: %s", status)
-	}
-}
-
-func (s *Stmt) convertArgument(val driver.Value) interface{} {
-	return val
+	return rows, nil
 }
 
 type Result struct {
