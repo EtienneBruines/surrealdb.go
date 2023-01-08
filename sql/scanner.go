@@ -176,6 +176,15 @@ func (s *SurrealUUID) Scan(value any) error {
 	return err
 }
 
+func (s SurrealUUID) MarshalText() (text []byte, err error) {
+	return (s.UUID()).MarshalText()
+}
+
+func (s *SurrealUUID) UnmarshalText(data []byte) error {
+	sUID := s.UUID()
+	return sUID.UnmarshalText(data)
+}
+
 func (s *SurrealUUID) Value() (driver.Value, error) {
 	return json.Marshal(s)
 }
